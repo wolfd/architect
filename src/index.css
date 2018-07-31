@@ -1,3 +1,13 @@
+*, body, html, .App {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+canvas {
+  display: block;
+}
+
 body {
   margin: 0;
   padding: 0;
