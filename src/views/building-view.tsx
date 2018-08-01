@@ -1,5 +1,6 @@
 import * as React from "react";
 import * as THREE from "three";
+import * as OrbitControls from "three-orbitcontrols";
 import { generateMesh } from "./geo-json";
 
 export interface IGeoFeature {
@@ -20,6 +21,8 @@ export default class BuildingView extends React.Component {
   private camera: THREE.PerspectiveCamera;
   private renderer: THREE.WebGLRenderer;
 
+  private controls: THREE.OrbitControls;
+
   private geoJson: IGeoJson;
 
   constructor(props: any) {
@@ -33,17 +36,17 @@ export default class BuildingView extends React.Component {
     const cube = new THREE.Mesh(geometry, material);
     this.scene.add(cube);
 
-    const hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 0.6 );
-    hemiLight.color.setHSL( 0.6, 1, 0.6 );
-    hemiLight.groundColor.setHSL( 0.095, 1, 0.75 );
-    hemiLight.position.set( 0, 50, 0 );
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 0.6);
+    hemiLight.color.setHSL(0.6, 1, 0.6);
+    hemiLight.groundColor.setHSL(0.095, 1, 0.75);
+    hemiLight.position.set(0, 50, 0);
     this.scene.add(hemiLight);
 
-    const directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
-    directionalLight.color.setHSL( 0.1, 1, 0.95 );
-    directionalLight.position.set( -1, 1.75, 1 );
-    directionalLight.position.multiplyScalar( 30 );
-    
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.color.setHSL(0.1, 1, 0.95);
+    directionalLight.position.set(-1, 1.75, 1);
+    directionalLight.position.multiplyScalar(30);
+
     this.scene.add(directionalLight);
 
     directionalLight.castShadow = true;
@@ -61,7 +64,7 @@ export default class BuildingView extends React.Component {
   }
 
   public generateMapGeometry() {
-    
+
     console.log(this.geoJson);
     for (const feature of this.geoJson.features) {
       // feature.geometry
@@ -77,11 +80,16 @@ export default class BuildingView extends React.Component {
       canvas: canvasEl,
       antialias: true,
       alpha: true,
+      logarithmicDepthBuffer: true,
     });
-    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    this.camera.position.z = 5;
+    this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 20, 30e6);
+    this.camera.position.z = 10e6;
 
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+
+    this.controls = new OrbitControls(this.camera, this.canvas.current);
+    // this.controls.enableDamping = true;
+    // this.controls.dampingFactor = 0.25;
 
     this.onAnimationFrame();
   }

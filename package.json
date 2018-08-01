@@ -12,6 +12,7 @@
     "react-dom": "^16.4.1",
     "react-scripts-ts": "2.16.0",
     "three": "^0.94.0",
+    "three-orbitcontrols": "^2.1.2",
     "topojson-client": "^3.0.0"
   },
   "scripts": {

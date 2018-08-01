@@ -1,32 +1,52 @@
 import * as d3 from "d3";
 import * as THREE from "three";
 import * as topojson from "topojson-client";
-import { graticule10, vertex } from "./geo-js";
+
+export const EARTH_RADIUS = 6.371e6;
+
 
 export const generateMesh = (scene: THREE.Scene) =>{
   const width = 960;
   const height = 960;
-  const radius = 228;
-  let mesh: any;
-  let graticule: any;
+  const radius = EARTH_RADIUS;
   let geoJson: any;
 
   fetch("https://unpkg.com/world-atlas@1/world/50m.json").then(
     response => response.json()
   ).then(json => {
     geoJson = json;
-    scene.add(graticule = wireframe(graticule10(), new THREE.LineBasicMaterial({color: 0xaaaaaa})));
-    scene.add(mesh = wireframe(topojson.mesh(geoJson, geoJson.objects.land), new THREE.LineBasicMaterial({color: 0xff0000})));
+    const geoLand = multiLineString(
+      topojson.mesh(geoJson, geoJson.objects.land),
+      new THREE.LineBasicMaterial({color: 0xff0000})
+    );
+    scene.add(geoLand);
   });
 }
 
-// Converts a GeoJSON MultiLineString in spherical coordinates to a THREE.LineSegments.
-function wireframe(multilinestring: any, material: THREE.Material) {
-  const geometry = new THREE.Geometry;
-  multilinestring.coordinates.forEach((line: any) => {
-    d3.pairs(line.map(vertex), (a: any, b: any) => {
+const latLongToNav = (long: number, lat: number, altitude: number) => {
+  const lambda = long * Math.PI / 180;
+  const phi = lat * Math.PI / 180;
+  const cosPhi = Math.cos(phi);
+
+  const radius = EARTH_RADIUS + altitude;
+
+  return new THREE.Vector3(
+    radius * cosPhi * Math.cos(lambda),
+    radius * cosPhi * Math.sin(lambda),
+    radius * Math.sin(phi)
+  );
+}
+
+export const multiLineString = (mls: GeoJSON.MultiLineString, material: THREE.LineMaterialType) => {
+  const geometry = new THREE.Geometry();
+  for (const line of mls.coordinates) {
+    const vectors = [];
+    for (const coord of line) {
+      vectors.push(latLongToNav(coord[0], coord[1], 0.0));
+    }
+    d3.pairs(vectors, (a, b) => {
       geometry.vertices.push(a, b);
     });
-  });
-  return new THREE.LineSegments(geometry, material as THREE.LineBasicMaterial);
+  }
+  return new THREE.LineSegments(geometry, material);
 }
