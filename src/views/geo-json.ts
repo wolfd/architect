@@ -6,9 +6,6 @@ export const EARTH_RADIUS = 6.371e6;
 
 
 export const generateMesh = (scene: THREE.Scene) =>{
-  const width = 960;
-  const height = 960;
-  const radius = EARTH_RADIUS;
   let geoJson: any;
 
   fetch("https://unpkg.com/world-atlas@1/world/50m.json").then(
@@ -23,7 +20,7 @@ export const generateMesh = (scene: THREE.Scene) =>{
   });
 }
 
-const latLongToNav = (long: number, lat: number, altitude: number) => {
+export const latLongToNav = (long: number, lat: number, altitude: number) => {
   const lambda = long * Math.PI / 180;
   const phi = lat * Math.PI / 180;
   const cosPhi = Math.cos(phi);
@@ -35,6 +32,34 @@ const latLongToNav = (long: number, lat: number, altitude: number) => {
     radius * cosPhi * Math.sin(lambda),
     radius * Math.sin(phi)
   );
+}
+
+export const lineString = (ls: GeoJSON.LineString, material: THREE.LineMaterialType) => {
+  const geometry = new THREE.Geometry();
+  const vectors = [];
+  for (const coord of ls.coordinates) {
+    vectors.push(latLongToNav(coord[0], coord[1], 0.0));
+  }
+  d3.pairs(vectors, (a, b) => {
+    geometry.vertices.push(a, b);
+  });
+
+  return new THREE.LineSegments(geometry, material);
+}
+
+export const polygon = (poly: GeoJSON.Polygon, material: THREE.LineMaterialType, extraHeight?: number) => {
+  const height = extraHeight ? extraHeight : 0.0;
+  const geometry = new THREE.Geometry();
+  for (const line of poly.coordinates) {
+    const vectors = [];
+    for (const coord of line) {
+      vectors.push(latLongToNav(coord[0], coord[1], height));
+    }
+    d3.pairs(vectors, (a, b) => {
+      geometry.vertices.push(a, b);
+    });
+  }
+  return new THREE.LineSegments(geometry, material);
 }
 
 export const multiLineString = (mls: GeoJSON.MultiLineString, material: THREE.LineMaterialType) => {

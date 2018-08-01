@@ -1,18 +1,11 @@
 import * as React from "react";
 import * as THREE from "three";
 import * as OrbitControls from "three-orbitcontrols";
-import { generateMesh } from "./geo-json";
-
-export interface IGeoFeature {
-  geometry: any;
-  id: string;
-  properties: any;
-  type: string;
-}
+import { generateMesh, latLongToNav, lineString, polygon } from "./geo-json";
 
 export interface IGeoJson {
   type: any;
-  features: IGeoFeature[];
+  features: GeoJSON.Feature[];
 }
 
 export default class BuildingView extends React.Component {
@@ -67,7 +60,35 @@ export default class BuildingView extends React.Component {
 
     console.log(this.geoJson);
     for (const feature of this.geoJson.features) {
-      // feature.geometry
+      if (feature.type !== "Feature") {
+        continue;
+      }
+      const geometry = feature.geometry as GeoJSON.Geometry;
+      if (geometry.type === "Polygon") {
+        this.scene.add(polygon(
+          geometry,
+          new THREE.LineBasicMaterial({color: 0x000f40})
+        ));
+        if (feature.properties !== undefined) {
+          const properties : any = feature.properties;
+          if (properties.building === "yes") {
+            for (let h = 0; h < 5; h++) {
+              this.scene.add(polygon(
+                geometry,
+                new THREE.LineBasicMaterial({color: 0x000f40}),
+                h * 2
+              ));
+            }
+          }
+        }
+      } else if (geometry.type === "LineString") {
+        this.scene.add(lineString(
+          geometry,
+          new THREE.LineBasicMaterial({color: 0x300f40})
+        ));
+      } else {
+        console.log(`Unsupported type: ${feature.geometry.type}`);
+      }
     }
   }
 
@@ -82,25 +103,25 @@ export default class BuildingView extends React.Component {
       alpha: true,
       logarithmicDepthBuffer: true,
     });
+    // TODO(danny): make up actually be up with controls
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 20, 30e6);
-    this.camera.position.z = 10e6;
+    const olin = [42.293556, -71.263966];
+    const olinGround = latLongToNav(olin[1], olin[0], 0.0);
+    const olinUp = latLongToNav(olin[1], olin[0], 1000.0);
+    this.camera.up.copy(olinUp.clone().sub(olinGround));
+    this.camera.position.copy(olinUp.clone().add(new THREE.Vector3(5,5,5)));
+    this.camera.lookAt(olinGround);
 
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
     this.controls = new OrbitControls(this.camera, this.canvas.current);
-    // this.controls.enableDamping = true;
-    // this.controls.dampingFactor = 0.25;
+    this.controls.target.copy(olinGround);
 
     this.onAnimationFrame();
   }
 
   public onAnimationFrame() {
     requestAnimationFrame(this.onAnimationFrame);
-
-    this.camera.position.z += 0.01;
-    this.camera.position.x += 0.05;
-    this.camera.lookAt(0, 0, 0);
-
     this.renderer.render(this.scene, this.camera);
   }
 
