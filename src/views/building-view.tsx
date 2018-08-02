@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as THREE from "three";
 import * as OrbitControls from "three-orbitcontrols";
-import { generateMesh, latLongToNav, lineString, polygon } from "./geo-json";
+import { building, generateMesh, latLongToNav, lineString, polygon } from "./geo-json";
 
 export interface IGeoJson {
   type: any;
@@ -72,13 +72,9 @@ export default class BuildingView extends React.Component {
         if (feature.properties !== undefined) {
           const properties : any = feature.properties;
           if (properties.building === "yes") {
-            for (let h = 0; h < 5; h++) {
-              this.scene.add(polygon(
-                geometry,
-                new THREE.LineBasicMaterial({color: 0x000f40}),
-                h * 2
-              ));
-            }
+            this.scene.add(building(
+              geometry, feature.properties, new THREE.MeshPhongMaterial()
+            ));
           }
         }
       } else if (geometry.type === "LineString") {

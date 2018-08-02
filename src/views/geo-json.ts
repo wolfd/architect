@@ -34,17 +34,34 @@ export const latLongToNav = (long: number, lat: number, altitude: number) => {
   );
 }
 
-export const lineString = (ls: GeoJSON.LineString, material: THREE.LineMaterialType) => {
-  const geometry = new THREE.Geometry();
-  const vectors = [];
-  for (const coord of ls.coordinates) {
-    vectors.push(latLongToNav(coord[0], coord[1], 0.0));
+export const building = (poly: GeoJSON.Polygon, properties: any, material: THREE.Material) => {
+  let object: THREE.Object3D | null = null;
+  const levels = properties['building:levels'];
+  if (levels !== undefined) {
+    object = polygon(
+      poly,
+      new THREE.LineBasicMaterial({color: 0x003f40}),
+      levels * 3
+    );
   }
-  d3.pairs(vectors, (a, b) => {
-    geometry.vertices.push(a, b);
-  });
-
-  return new THREE.LineSegments(geometry, material);
+  const height = properties.height;
+  const minHeight = properties.min_height;
+  if (height !== undefined) { // TODO: parse height if not number
+    const low = minHeight !== undefined ? minHeight : 0;
+    object = polygon(
+      poly,
+      new THREE.LineBasicMaterial({color: 0x00ff40}),
+      height
+    );
+  }
+  if (object === null) {
+    object = polygon(
+      poly,
+      new THREE.LineBasicMaterial({color: 0x003f40}),
+      0
+    );
+  }
+  return object;
 }
 
 export const polygon = (poly: GeoJSON.Polygon, material: THREE.LineMaterialType, extraHeight?: number) => {
@@ -59,6 +76,19 @@ export const polygon = (poly: GeoJSON.Polygon, material: THREE.LineMaterialType,
       geometry.vertices.push(a, b);
     });
   }
+  return new THREE.LineSegments(geometry, material);
+}
+
+export const lineString = (ls: GeoJSON.LineString, material: THREE.LineMaterialType) => {
+  const geometry = new THREE.Geometry();
+  const vectors = [];
+  for (const coord of ls.coordinates) {
+    vectors.push(latLongToNav(coord[0], coord[1], 0.0));
+  }
+  d3.pairs(vectors, (a, b) => {
+    geometry.vertices.push(a, b);
+  });
+
   return new THREE.LineSegments(geometry, material);
 }
 
