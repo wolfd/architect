@@ -1,7 +1,7 @@
 import * as React from "react";
 import * as THREE from "three";
 import * as OrbitControls from "three-orbitcontrols";
-import { building, generateMesh, latLongToNav, lineString, polygon } from "./geo-json";
+import { building, generateMesh, latLongToNav, lineString, polygon, rotation, up } from "./geo-json";
 
 export interface IGeoJson {
   type: any;
@@ -46,7 +46,7 @@ export default class BuildingView extends React.Component {
 
     this.onAnimationFrame = this.onAnimationFrame.bind(this);
 
-    fetch("/map.geo.json").then(
+    fetch("/boston.geo.json").then(
       response => response.json()
     ).then(geoJson => {
       this.geoJson = geoJson;
@@ -98,20 +98,18 @@ export default class BuildingView extends React.Component {
       antialias: true,
       alpha: true,
       logarithmicDepthBuffer: true,
+      precision: "highp",
     });
     // TODO(danny): make up actually be up with controls
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 20, 30e6);
-    const olin = [42.293556, -71.263966];
-    const olinGround = latLongToNav(olin[1], olin[0], 0.0);
-    const olinUp = latLongToNav(olin[1], olin[0], 1000.0);
-    this.camera.up.copy(olinUp.clone().sub(olinGround));
-    this.camera.position.copy(olinUp.clone().add(new THREE.Vector3(5,5,5)));
-    this.camera.lookAt(olinGround);
-
+    this.camera.position.copy(new THREE.Vector3(0, 100, 0));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
 
     this.controls = new OrbitControls(this.camera, this.canvas.current);
-    this.controls.target.copy(olinGround);
+
+    this.scene.add(new THREE.ArrowHelper(up, new THREE.Vector3(), 10, 0xff0000));
+    this.scene.add(new THREE.AxesHelper(5));
+    this.scene.add(new THREE.ArrowHelper(up.clone().applyMatrix3(rotation), new THREE.Vector3(), 10, 0xff0000));
 
     this.onAnimationFrame();
   }

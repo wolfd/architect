@@ -20,7 +20,7 @@ export const generateMesh = (scene: THREE.Scene) =>{
   });
 }
 
-export const latLongToNav = (long: number, lat: number, altitude: number) => {
+export const latLongToGlobal = (long: number, lat: number, altitude: number) => {
   const lambda = long * Math.PI / 180;
   const phi = lat * Math.PI / 180;
   const cosPhi = Math.cos(phi);
@@ -32,6 +32,41 @@ export const latLongToNav = (long: number, lat: number, altitude: number) => {
     radius * cosPhi * Math.sin(lambda),
     radius * Math.sin(phi)
   );
+}
+
+const longLatOrigin = [42.360888, -71.059705];
+const origin = latLongToGlobal(longLatOrigin[1], longLatOrigin[0], 0);
+const aboveOrigin = latLongToGlobal(longLatOrigin[1], longLatOrigin[0], 2);
+export const up = aboveOrigin.clone().sub(origin).normalize();
+
+const matrixToRotateOntoVector = (a: THREE.Vector3, b: THREE.Vector3) => {
+  const v = a.clone().cross(b);
+  const c = a.dot(b);
+
+  const vX = new THREE.Matrix3().fromArray([
+    0, -v.z, v.y, //
+    v.z, 0, -v.x, //
+    -v.y, v.x, 0 //
+  ]);
+
+  const vX2 = vX.clone().multiply(vX).multiplyScalar(1 / (1 + c));
+
+  const I = new THREE.Matrix3().identity();
+  const newValues = I.toArray();
+  const vXa = vX.toArray();
+  const vX2a = vX2.toArray();
+  for (let i = 0; i < newValues.length; i++) {
+    newValues[i] += vXa[i] + vX2a[i];
+  }
+  return new THREE.Matrix3().fromArray(newValues);
+}
+
+export const rotation = matrixToRotateOntoVector(new THREE.Vector3(0, 1, 0), up);
+console.log(rotation);
+
+export const latLongToNav = (long: number, lat: number, altitude: number) => {
+  const unrotated = latLongToGlobal(long, lat, altitude).sub(origin);
+  return unrotated.applyMatrix3(rotation);
 }
 
 export const building = (poly: GeoJSON.Polygon, properties: any, material: THREE.Material) => {
