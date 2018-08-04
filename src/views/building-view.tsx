@@ -33,11 +33,12 @@ export default class BuildingView extends React.Component {
     hemiLight.color.setHSL(0.6, 1, 0.6);
     hemiLight.groundColor.setHSL(0.095, 1, 0.75);
     hemiLight.position.set(0, 50, 0);
+    hemiLight.up.set(0, 1, 0);
     this.scene.add(hemiLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.color.setHSL(0.1, 1, 0.95);
-    directionalLight.position.set(-1, 1.75, 1);
+    directionalLight.position.set(0, 0, 1);
     directionalLight.position.multiplyScalar(30);
 
     this.scene.add(directionalLight);
@@ -65,17 +66,27 @@ export default class BuildingView extends React.Component {
       }
       const geometry = feature.geometry as GeoJSON.Geometry;
       if (geometry.type === "Polygon") {
-        this.scene.add(polygon(
-          geometry,
-          new THREE.LineBasicMaterial({color: 0x000f40})
-        ));
-        if (feature.properties !== undefined) {
-          const properties : any = feature.properties;
-          if (properties.building === "yes") {
-            this.scene.add(building(
-              geometry, feature.properties, new THREE.MeshPhongMaterial()
-            ));
-          }
+        if (feature.properties === undefined) {
+          this.scene.add(polygon(
+            geometry,
+            new THREE.LineBasicMaterial({color: 0x000f40})
+          ));
+        }
+        const properties : any = feature.properties;
+        if (properties.building === "yes") {
+          this.scene.add(building(
+            geometry, feature.properties, new THREE.MeshPhongMaterial()
+          ));
+        } else if (properties.building) {
+          this.scene.add(building(
+            geometry, feature.properties, new THREE.MeshPhongMaterial()
+          ));
+          console.log(properties.building);
+        } else {
+          this.scene.add(polygon(
+            geometry,
+            new THREE.LineBasicMaterial({color: 0x000f40})
+          ));
         }
       } else if (geometry.type === "LineString") {
         this.scene.add(lineString(
