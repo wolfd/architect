@@ -4,6 +4,7 @@ import * as topojson from "topojson-client";
 
 export const EARTH_RADIUS = 6.371e6;
 
+export type PolygonCoordinates = number[][][];
 
 export const generateMesh = (scene: THREE.Scene) => {
   let geoJson: any;
@@ -89,15 +90,10 @@ export const generateMapGeometry = (geoJson: GeoJSON.FeatureCollection): THREE.G
       }
 
       const properties: any = feature.properties;
-      if (properties.building === "yes") {
+      if (properties.building) {
         buildings.add(building(
-          geometry, feature.properties
+          geometry.coordinates, properties
         ));
-      } else if (properties.building) {
-        buildings.add(building(
-          geometry, feature.properties
-        ));
-        console.debug(properties.building);
       }
 
       if (properties.natural) {
@@ -108,6 +104,19 @@ export const generateMapGeometry = (geoJson: GeoJSON.FeatureCollection): THREE.G
         geometry,
         new THREE.LineBasicMaterial({ color: 0x300f40 })
       ));
+    } else if (geometry.type === "MultiPolygon") {
+      console.log(feature);
+      if (!feature.properties) {
+        continue;
+      }
+      const properties: any = feature.properties;
+      if (properties.natural) {
+        naturalGroup.add(natural(geometry, properties));
+      }
+
+      if (properties.building) {
+        buildings.add(multiBuilding(geometry.coordinates, properties));
+      }
     } else {
       console.debug(`Unsupported type: ${feature.geometry.type}`);
     }
@@ -120,8 +129,11 @@ export const generateMapGeometry = (geoJson: GeoJSON.FeatureCollection): THREE.G
   return group;
 }
 
-export const natural = (poly: GeoJSON.Polygon, properties: any) => {
-  const mesh = new THREE.Mesh(flatPolygon(poly), naturalMaterial(properties));
+export const natural = (poly: GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: any) => {
+  const bufGeom = poly.type === "MultiPolygon" ?
+    multiFlatPolygon(poly.coordinates) :
+    flatPolygon(poly.coordinates);
+  const mesh = new THREE.Mesh(bufGeom, naturalMaterial(properties));
   return mesh;
 }
 
@@ -155,7 +167,16 @@ export const naturalMaterial = (properties: any) => {
   });
 }
 
-export const building = (poly: GeoJSON.Polygon, properties: any) => {
+export const multiBuilding = (multiPoly: PolygonCoordinates[], properties: any): THREE.Group => {
+  const group = new THREE.Group();
+  for (const poly of multiPoly) {
+    group.add(building(poly, properties));
+  }
+
+  return group;
+}
+
+export const building = (poly: PolygonCoordinates, properties: any) => {
   const mesh = new THREE.Mesh(
     buildingGeometry(poly, properties),
     [roofMaterial(properties), buildingMaterial(properties)]
@@ -167,7 +188,7 @@ export const building = (poly: GeoJSON.Polygon, properties: any) => {
   return mesh;
 }
 
-export const buildingGeometry = (poly: GeoJSON.Polygon, properties: any) => {
+export const buildingGeometry = (poly: PolygonCoordinates, properties: any) => {
   const height = properties.height;
   const minHeight = properties.min_height;
   if (height !== undefined) { // TODO: parse height if not number
@@ -237,13 +258,13 @@ export const buildingMaterial = (properties: any): THREE.MeshMaterialType => {
   return new THREE.MeshStandardMaterial();
 }
 
-export const shapeFromPolygon = (poly: GeoJSON.Polygon): THREE.Shape => {
+export const shapeFromPolygon = (poly: PolygonCoordinates): THREE.Shape => {
   const outerRing: THREE.Vector2[] = [];
 
   let shape: THREE.Shape | null = null;
 
   let outerRingDone = true;
-  for (const line of poly.coordinates) {
+  for (const line of poly) {
     if (outerRingDone) {
       for (const coord of line) {
         outerRing.push(new THREE.Vector2(coord[0], coord[1]));
@@ -270,7 +291,7 @@ export const shapeFromPolygon = (poly: GeoJSON.Polygon): THREE.Shape => {
   return shape;
 }
 
-export const flatPolygon = (poly: GeoJSON.Polygon): THREE.BufferGeometry => {
+export const flatPolygon = (poly: PolygonCoordinates): THREE.BufferGeometry => {
   const shape = shapeFromPolygon(poly);
   const geometry = new THREE.ShapeBufferGeometry(shape);
   const positions = geometry.getAttribute("position");
@@ -284,7 +305,25 @@ export const flatPolygon = (poly: GeoJSON.Polygon): THREE.BufferGeometry => {
   return geometry;
 }
 
-export const extrudePolygon = (poly: GeoJSON.Polygon, height: number, minHeight?: number): THREE.ExtrudeBufferGeometry => {
+export const extrudeMaybeMultiPolygon = (poly: GeoJSON.Polygon | GeoJSON.MultiPolygon, height: number, minHeight?: number) => {
+  if (poly.type === "MultiPolygon") {
+    return extrudeMultiPolygon(poly.coordinates, height, minHeight);
+  } else {
+    return extrudePolygon(poly.coordinates, height, minHeight);
+  }
+}
+
+export const multiFlatPolygon = (multiPoly: PolygonCoordinates[]): THREE.BufferGeometry => {
+  const geom = new THREE.BufferGeometry();
+  for (const polyCoords of multiPoly) {
+    geom.merge(flatPolygon(polyCoords), 0);
+  }
+
+  console.log(geom);
+  return geom;
+}
+
+export const extrudePolygon = (poly: PolygonCoordinates, height: number, minHeight?: number): THREE.ExtrudeBufferGeometry => {
   const min = minHeight ? minHeight : 0;
 
   const shape = shapeFromPolygon(poly);
@@ -303,6 +342,16 @@ export const extrudePolygon = (poly: GeoJSON.Polygon, height: number, minHeight?
   }
 
   return geometry;
+}
+
+// who knows if this works right
+export const extrudeMultiPolygon = (multiPoly: PolygonCoordinates[], height: number, minHeight?: number): THREE.BufferGeometry => {
+  const geom = new THREE.BufferGeometry();
+  for (const poly of multiPoly) {
+    geom.merge(extrudePolygon(poly, height, minHeight), 0);
+  }
+
+  return geom;
 }
 
 export const polygon = (poly: GeoJSON.Polygon, material: THREE.LineMaterialType, extraHeight?: number) => {
