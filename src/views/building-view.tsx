@@ -1,12 +1,7 @@
 import * as React from "react";
 import * as THREE from "three";
 import * as OrbitControls from "three-orbitcontrols";
-import { building, generateMesh, latLongToNav, lineString, polygon, rotation, up } from "./geo-json";
-
-export interface IGeoJson {
-  type: any;
-  features: GeoJSON.Feature[];
-}
+import { generateMapGeometry, generateMesh, rotation, up } from "./geo-json";
 
 export default class BuildingView extends React.Component {
   private canvas: React.RefObject<HTMLCanvasElement>;
@@ -16,13 +11,22 @@ export default class BuildingView extends React.Component {
 
   private controls: THREE.OrbitControls;
 
-  private geoJson: IGeoJson;
+  private geoJson: GeoJSON.FeatureCollection;
+
+  private mouse: { x: number, y: number };
+
+  private intersected: THREE.Object3D;
+  private raycaster: THREE.Raycaster;
+
+  private buildings: THREE.Group;
 
   constructor(props: any) {
     super(props);
     this.canvas = React.createRef();
 
     this.scene = new THREE.Scene();
+
+    this.buildings = new THREE.Group();
 
     const geometry = new THREE.BoxGeometry(1, 1, 1);
     const material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
@@ -45,58 +49,25 @@ export default class BuildingView extends React.Component {
 
     directionalLight.castShadow = true;
 
+    this.mouse = { x: 0, y: 0 };
+
+    document.addEventListener('mousemove', (event: MouseEvent) => {
+      event.preventDefault();
+      this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      this.mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+    }, false);
+
     this.onAnimationFrame = this.onAnimationFrame.bind(this);
 
     fetch("/boston.geo.json").then(
       response => response.json()
     ).then(geoJson => {
-      this.geoJson = geoJson;
-      this.generateMapGeometry();
+      this.geoJson = geoJson as GeoJSON.FeatureCollection;
+      this.buildings = generateMapGeometry(this.geoJson);
+      this.scene.add(this.buildings);
     });
 
     generateMesh(this.scene);
-  }
-
-  public generateMapGeometry() {
-
-    console.log(this.geoJson);
-    for (const feature of this.geoJson.features) {
-      if (feature.type !== "Feature") {
-        continue;
-      }
-      const geometry = feature.geometry as GeoJSON.Geometry;
-      if (geometry.type === "Polygon") {
-        if (feature.properties === undefined) {
-          this.scene.add(polygon(
-            geometry,
-            new THREE.LineBasicMaterial({color: 0x000f40})
-          ));
-        }
-        const properties : any = feature.properties;
-        if (properties.building === "yes") {
-          this.scene.add(building(
-            geometry, feature.properties, new THREE.MeshPhongMaterial()
-          ));
-        } else if (properties.building) {
-          this.scene.add(building(
-            geometry, feature.properties, new THREE.MeshPhongMaterial()
-          ));
-          console.log(properties.building);
-        } else {
-          this.scene.add(polygon(
-            geometry,
-            new THREE.LineBasicMaterial({color: 0x000f40})
-          ));
-        }
-      } else if (geometry.type === "LineString") {
-        this.scene.add(lineString(
-          geometry,
-          new THREE.LineBasicMaterial({color: 0x300f40})
-        ));
-      } else {
-        console.log(`Unsupported type: ${feature.geometry.type}`);
-      }
-    }
   }
 
   public componentDidMount() {
@@ -111,6 +82,7 @@ export default class BuildingView extends React.Component {
       logarithmicDepthBuffer: true,
       precision: "highp",
     });
+
     // TODO(danny): make up actually be up with controls
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 20, 30e6);
     this.camera.position.copy(new THREE.Vector3(0, 100, 0));
@@ -122,11 +94,21 @@ export default class BuildingView extends React.Component {
     this.scene.add(new THREE.AxesHelper(5));
     this.scene.add(new THREE.ArrowHelper(up.clone().applyMatrix3(rotation), new THREE.Vector3(), 10, 0xff0000));
 
+    this.raycaster = new THREE.Raycaster();
+
     this.onAnimationFrame();
   }
 
   public onAnimationFrame() {
     requestAnimationFrame(this.onAnimationFrame);
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects(this.buildings.children, true);
+
+    if (intersects.length && this.intersected !== intersects[0].object) {
+      this.intersected = intersects[0].object;
+      console.log("got", this.intersected);
+    }
+
     this.renderer.render(this.scene, this.camera);
   }
 
