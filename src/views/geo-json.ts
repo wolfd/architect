@@ -72,6 +72,7 @@ export const latLongToNav = (long: number, lat: number, altitude: number) => {
 export const generateMapGeometry = (geoJson: GeoJSON.FeatureCollection): THREE.Group => {
   const buildings = new THREE.Group();
   const naturalGroup = new THREE.Group();
+  const waterways = new THREE.Group();
   const lineGroup = new THREE.Group();
   const group = new THREE.Group();
   for (const feature of geoJson.features) {
@@ -79,6 +80,7 @@ export const generateMapGeometry = (geoJson: GeoJSON.FeatureCollection): THREE.G
       continue;
     }
     const geometry = feature.geometry as GeoJSON.Geometry;
+    // TODO: invert, check properties and then delegate?
     if (geometry.type === "Polygon") {
       // remove?
       if (feature.properties === undefined) {
@@ -94,6 +96,10 @@ export const generateMapGeometry = (geoJson: GeoJSON.FeatureCollection): THREE.G
         buildings.add(building(
           geometry.coordinates, properties
         ));
+      }
+
+      if (properties.waterway) {
+        waterways.add(waterway(geometry, properties));
       }
 
       if (properties.natural) {
@@ -122,11 +128,27 @@ export const generateMapGeometry = (geoJson: GeoJSON.FeatureCollection): THREE.G
     }
   }
 
-  // group.add(lineGroup);
+  group.add(lineGroup);
   group.add(buildings);
   group.add(naturalGroup);
+  group.add(waterways);
 
   return group;
+}
+
+export const waterway = (poly: GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: any) => {
+  const bufGeom = poly.type === "MultiPolygon" ?
+    multiFlatPolygon(poly.coordinates) :
+    flatPolygon(poly.coordinates);
+  const mesh = new THREE.Mesh(bufGeom, new THREE.MeshPhysicalMaterial({
+    color: 0xe2c3c,
+    roughness: 0.15,
+    metalness: 0.00,
+    reflectivity: 0.77,
+    clearCoat: 0.61,
+    clearCoatRoughness: 0.28
+  }));
+  return mesh;
 }
 
 export const natural = (poly: GeoJSON.Polygon | GeoJSON.MultiPolygon, properties: any) => {
