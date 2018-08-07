@@ -59,7 +59,7 @@ export default class BuildingView extends React.Component {
 
     this.onAnimationFrame = this.onAnimationFrame.bind(this);
 
-    fetch("/boston.geo.json").then(
+    fetch(`boston.geo.json`).then(
       response => response.json()
     ).then(geoJson => {
       this.geoJson = geoJson as GeoJSON.FeatureCollection;
